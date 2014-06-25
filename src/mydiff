@@ -1,0 +1,14 @@
+#!/bin/bash
+
+maindir=$1
+
+otherdir=$2
+
+for itr in ${maindir}*.c ${maindir}*.h ; do
+    diff $itr ${otherdir}${itr##*/}
+    if [ $? == 1 ] ; then
+	echo -e "^^^ diff $itr ${otherdir}${itr##*/} ^^^\n"
+    fi
+done
+
+# end script

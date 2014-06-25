@@ -1,0 +1,10 @@
+#!/bin/bash
+
+./msgcli pluto<<EOF
+%ONE jjj kkkk
+%ONE pluto kkkk
+%ONE minnie llll
+%LIST
+One old fox ...
+%EXIT
+EOF

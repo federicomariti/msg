@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# file: logpro
+#  \author Federico Mariti
+#  Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+#  originale dell' autore.  
+
+SCRIPTNAME=${0##*/}
+
+# parseRow()
+# analizza la struttura di una stringa (riga) nel formato "nick:nick:text"
+# dove nick e' un nome utente e text una sottostringa qualsiasi.
+# input variables:  1 la stringa nel formato nick:nick:text da convertire
+#                     nella tripla di stringhe (nomeMtt, nomeRcv, testoMsg)
+# output variables: SENDER   la stringa contenente il nome del mittente
+#                   RECEIVER la stringa contenente il nome del ricevente
+#                   TEXT     la stringa contenente il testo del messaggio
+# returns: 0 parsing della riga effettuato con successo
+#          1 parsing non effettuato, la riga e' vuota
+#          2 parsing non effettuato, la riga non ha il formato nick:nick:text
+# note: la variabile NOTIN_NICK e' usata per specificare i caratteri illegali 
+#       per un nome utente (nick name), se diversa da vuota allora non viene 
+#       modificata, altrimenti assume il valore $' \t' (anche il carattere :
+#       e' naturalemente illegale)
+function parseRow() {
+    if [ -z $1 ] ; then 
+	return 1
+    fi
+
+    if [ -z "$NOTIN_NICK" ] ; then
+	NOTIN_NICK=$' \t'
+    fi
+
+    SENDER=${1%%:*}
+    RECEIVER=${1#*:}
+    TEXT=${RECEIVER#*:}
+    if [ $TEXT = $RECEIVER ] ; then 
+	# manca un campo
+	return 2
+    fi
+    RECEIVER=${RECEIVER%%:*}
+
+    if [ $SENDER = $1 ] \
+	|| [ ${RECEIVER%[${NOTIN_NICK}]*} != $RECEIVER ] \
+	|| [ ${SENDER%[${NOTIN_NICK}]*} != $SENDER ] ; then
+	# mancano due campi,
+	# oppure il nick del ricevente contiene un carattere non valido,
+	# oppure il nick del mittente contiene un carattere non valido
+	return 2
+    fi
+
+    return 0
+}
+
+
+if [ $# != 1 ] ; then
+    echo "Usage: ${SCRIPTNAME} logfile"
+elif ! [ -f "$1" ] ; then 
+    echo "${SCRIPTNAME}: non esiste il file regolare \"$1\"." 1>&2
+    exit 1
+elif ! [ -r "$1" ] ; then 
+    echo "${SCRIPTNAME}: il file \"$1\" non e' leggibile." 1>&2
+    exit 1
+elif ! [ -s "$1" ] ; then 
+    echo "${SCRIPTNAME}: il file \"$1\" e' vuoto." 
+    exit 1
+else
+    # IFS e' letta e usata dal builtin read, non deve contenere ":" o altri
+    # caratteri separatori che possono occorrere nel campo testo di una riga
+    IFS=
+
+    # rappresenta una lista di (nick name, num caratteri inviati)
+    # formato nick0:numChar0 nick1:numChar1 ... nicki:numChari ...
+    NICKS=
+
+    ROW=1
+    IGNOREDROWS=
+
+    exec 3< $1
+    
+    while read -u 3 || [ -n "$REPLY" ] ; do 
+	parseRow $REPLY
+
+	case $? in
+	    0)
+		if [ "${NICKS}" = "${NICKS/$SENDER/}" ] ; then 
+    	        # il nick di $SENDER non e' presente in lista e viene aggiunto
+	        # in testa
+		    NICKS="$SENDER:${#TEXT} $NICKS"
+		else 
+	        # il nick di $SENDER e' presente in lista, viene letto e 
+	        # sovrascritto il numero di caratteri inviati da $SENDER
+		    NCHAR=${NICKS##*$SENDER:}
+		    NCHAR=${NCHAR%% *}
+		    NICKS=${NICKS/${SENDER}:$NCHAR /${SENDER}:$((NCHAR+${#TEXT})) }
+		fi
+		;;
+	    1)
+		# do nothing <=> ignora new line in $1
+		if [ -z $IGNOREDROWS ] ; then 
+		    IGNOREDROWS=$ROW
+		else
+		    IGNOREDROWS="${ROW}, $IGNOREDROWS"
+		fi
+		;; 
+	    2)
+		# grave errore di parsing, interruzione dell'escuzione
+		exec 3>&-
+		echo "${SCRIPTNAME}: il file $1 non ha il formato \"nickSnd:nickRcv:text\" alla riga $ROW" 1>&2
+		exit 1
+		;;
+	esac
+	
+	ROW=$((ROW+1))
+    done
+
+    exec 3>&-
+
+    if [ -z "$NICKS" ] ; then 
+	echo "${SCRIPTNAME}: nessuna riga di $1 e' stata analizzata con successo"
+    else
+	# printing 
+	NICKS=${NICKS% }
+	NICKS=${NICKS// /"\n"}
+	NICKS=${NICKS//:/" "}
+
+	echo -e "$NICKS" | sort -f
+    fi
+
+    if [ -n "$IGNOREDROWS" ] ; then
+	echo -e "${SCRIPTNAME}: le seguenti linee sono state ignorate:\t$IGNOREDROWS"
+    fi
+
+	
+fi
+
+# END OF SCRIPT

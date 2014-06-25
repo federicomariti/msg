@@ -1,0 +1,10 @@
+#!/bin/bash
+
+./msgcli PaPeRino45<<EOF
+%ONE pluto ciao
+%ONE PaPeRino45 kkkk
+%ONE minnie llll
+%LIST
+One two three  ...
+%EXIT
+EOF

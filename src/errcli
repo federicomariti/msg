@@ -1,0 +1,10 @@
+---DBG--- msgcli-sender: start, socket = 3
+---DBG--- msgcli-receiver: start
+---DBG--- msgcli-receiver: RECEIVED: type = B, buffer = >[pluto] asq wfwqf asf<
+---DBG--- msgcli-receiver: RECEIVED: type = T, buffer = >[pippo] fghjkladsfgdh<
+---DBG--- msgcli-receiver: RECEIVED: type = X, buffer = >(null)<
+---DBG--- msgcli-receive: terminated by server
+message = >minnie fghjkladsfgdh<,message length = 21
+---DBG--- msgcli-sender: SENT: type = one
+---DBG--- msgcli-receiver: RECEIVED: type = X, buffer = >(null)<---DBG--- msgcli-receiver: RECEIVED: type = X, buffer = >(null)<
+---DBG--- msgcli-receive: terminated by server

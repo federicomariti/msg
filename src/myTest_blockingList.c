@@ -1,0 +1,760 @@
+/**
+ *  \file myTest_blockingList.c
+ *  \author Federico Mariti
+ * Si dichiara che il contenuto di questo file e' in ogni sua parte opera
+ * originale dell' autore.  
+ */
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <time.h>
+
+#include "blockingList.h"
+#include "blockingList_itr.h"
+#include "blockingList_private.h"
+#include "errorUtil.h"
+
+/* variabile booleana per decidere se stampare le informazione di 
+   debug o meno */
+#ifdef DBG
+static const char dbg = 1;
+#else
+static const char dbg = 0;
+#endif
+
+/* variabile booleana per decidere se stampare le informazioni dei 
+   test o meno */
+static char printInfo = 0;
+
+#define _printDbg_tt(thread_name, text)				\
+  if (dbg) printf("--- DBG:  "thread_name": "text"  ---\n");
+
+#define _printInfo_tt(thread_name, textInfo)		\
+  if (printInfo) printf(thread_name": "textInfo"\n");
+
+#define _printInfo_tiidt(thread_name, thread_iide, textInfo)		\
+  if (printInfo) printf(thread_name"-%d: "textInfo"\n", thread_iide);
+
+#define _sleep(_timespec_var, _toSleep, _threadName)			\
+  _timespec_var.tv_sec = (time_t)_toSleep;				\
+  _handle_meno1err_ptexit(  nanosleep(&_timespec_var, NULL),		\
+			    _threadName, "nanosleep"  );		
+
+
+/* ====================================================================== */
+
+static char * strings[] = {
+  "Ticking away the moments that make up a dull day",
+  "You fritter and waste the hours in an offhand way.", 
+  "Kicking around on a piece of ground in your home town",
+  "Waiting for someone or something to show you the way.",
+
+  "Tired of lying in the sunshine staying home to watch the rain.",
+  "You are young and life is long and there is time to kill today.",
+  "And then one day you find ten years have got behind you.",
+  "No one told you when to run, you missed the starting gun.", 
+
+  "So you run and you run to catch up with the sun but it's sinking",
+  "Racing around to come up behind you again.",
+  "The sun is the same in a relative way but you're older,",
+  "Shorter of breath and one day closer to death.",
+
+  "Every year is getting shorter never seem to find the time.",
+  "Plans that either come to naught or half a page of scribbled lines",
+  "Hanging on in quiet desperation is the English way",
+  "The time is gone, the song is over,",
+  "Thought I'd something more to say.",
+  NULL
+};
+
+#define _nstring 17
+
+/* ====================================================================== */
+
+/** funzione di confronto per lista di interi 
+    \param a puntatore intero da confrontare
+    \param b puntatore intero da confrontare
+    
+    \retval 0 se sono uguali
+    \retval p (p!=0) altrimenti
+*/
+int compare_int(void *a, void *b) {
+    int *_a, *_b;
+    _a = (int *) a;
+    _b = (int *) b;
+    return ((*_a) - (*_b));
+}
+
+/** funzione di confronto per lista di stringhe 
+    \param a puntatore prima stringa da confrontare
+    \param b puntatore seconda stringa da confrontare
+    
+    \retval 0 se sono uguali
+    \retval p (p!=0) altrimenti
+*/
+int compare_string(void *a, void *b) {
+    char *_a, *_b;
+    _a = (char *) a;
+    _b = (char *) b;
+    return strcmp(_a,_b);
+}
+
+
+/** funzione di copia di un intero 
+    \param a puntatore intero da copiare
+
+    \retval NULL se si sono verificati errori
+    \retval p puntatore al nuovo intero allocato (alloca memoria)
+*/
+void * copy_int(void *a) {
+  int * _a;
+
+  if ( ( _a = malloc(sizeof(int) ) ) == NULL ) return NULL;
+
+  *_a = * (int * ) a;
+
+  return (void *) _a;
+}
+
+/** funzione di copia di una stringa 
+    \param a puntatore stringa da copiare
+
+    \retval NULL se si sono verificati errori
+    \retval p puntatore alla stringa allocata (alloca memoria)
+*/
+void * copy_string(void * a) {
+  char * _a;
+
+  if ( ( _a = strdup(( char * ) a ) ) == NULL ) return NULL;
+
+  return (void *) _a;
+}
+
+/* ====================================================================== */
+
+
+define_blockingList_push(blockingList_push_string, char *)
+
+define_blockingList_pop(blockingList_pop_string, char **)
+
+define_blockingList_remove(blockingList_remove_string, char *)
+
+define_blockingList_removeAll(blockingList_removeAll_string, char *)
+
+define_blockingList_contains(blockingList_contains_string, char *)
+
+define_blockingList_add(blockingList_put_string, char *)
+
+define_blockingList_take(blockingList_take_string, char **)
+
+/* ====================================================================== */
+
+/* crea e distruggi 
+ * blockingList_init, blockingList_destroy, 
+ * blockingList_new, blockingList_free */
+int 
+test0(void) 
+{
+  blockingList_t list;
+  blockingList_t * listp =  NULL;
+
+  /* INIT: USO CORRETTO */
+  _handle_meno1err_exit(  blockingList_init(&list, 0, 
+					    copy_int,
+					    compare_int),
+			  "test0", "blockingList_init"  );
+
+  /* INIT: USO NON CORRETTO */
+  if (0 == blockingList_init(NULL, 0, copy_int, compare_int)) {
+    fprintf(stderr, "test0: blockingList_init con list = NULL\n");
+    return -1; }
+  if (0 == blockingList_init(&list, -1, copy_int, compare_int)) {
+    fprintf(stderr, "test0: blockingList_init con maxSize<0\n");
+    return -1; }
+  if (0 == blockingList_init(&list, 0, NULL, compare_int)) {
+    fprintf(stderr, "test0: blockingList_init con copy_fun = NULL\n");
+    return -1; }
+
+  /* DESTROY: USO CORRETTO */
+  _handle_meno1err_exit(  blockingList_destroy(&list),
+			  "test0", "blockingList_destroy"  );
+  /* .. */
+
+
+  /* NEW: USO CORRETTO */
+  _handle_nullerr_exit(  listp = blockingList_new(0, copy_int,
+						  compare_int),
+			 "test0", "blockingList_new"  );
+
+  /* NEW: USO NON CORRETTO */
+  if (NULL != blockingList_new(-1, copy_int, compare_int)) {
+    fprintf(stderr, "test0: blockingList_new con maxSize<0\n");
+    return -1; }
+  if (NULL != blockingList_new(-1, copy_int, compare_int)) {
+    fprintf(stderr, "test0: blockingList_new con copy_fun = NULL\n");
+    return -1; }
+  
+  /* FREE: USO CORRETTO */
+  blockingList_free(&listp);
+
+  if (NULL != listp)
+    return -1;
+
+  return 0;
+}
+
+/* ====================================================================== */
+
+/* inserisci e ricerca 
+ * blockingList_push_string, blockingList_contains */
+int
+test1(void)
+{
+  blockingList_t list;
+  int i = 0, found = 0;
+
+
+  _handle_meno1err_exit(  blockingList_init(&list, 0, 
+					    copy_string, compare_string),
+			  "test1", "blockingList_init"  );
+
+  /* USO CORRETTO */
+  for (i=0; i<_nstring-1; i++) 
+    _handle_meno1err_exit(  blockingList_push_string(&list, strings[i]),
+			    "test1", "blockingList_push_string-for1"  );
+
+  for (i=0; i<_nstring-1; i++) {
+    _handle_meno1err_exit(  found =
+			    blockingList_contains(&list, strings[i]),
+			    "test1", "blockingList_contains-for1"  );
+    if (!found) {
+      fprintf(stderr, "elemento %s(%d) non trovato\n", strings[i], i);
+      return -1;
+    }
+  }
+
+  for (i=_nstring-2; i>-1; i--) {
+    _handle_meno1err_exit(  found =
+			    blockingList_contains(&list, strings[i]),
+			    "test1", "blockingList_contains-for2"  );
+    if (!found) {
+      fprintf(stderr, "elemento %s(%d) non trovato\n", strings[i], i);
+      return -1;
+    }
+  }      
+
+
+  /* USO NON CORRETTO */
+  _handle_meno1err_exit(  found = 
+			  blockingList_contains(&list, strings[_nstring-1]),
+			  "test1", "blockingList_contains-1"  );
+  if (found) {
+    fprintf(stderr, "test1: trovato un elemento non aggiunto\n");
+    return -1;
+  }
+
+  if ( -1 != blockingList_push_string(&list, NULL) ) {
+    fprintf(stderr, "test1: push con valuep = NULL\n");
+    return -1; }
+
+  if ( -1 != blockingList_push_string(NULL, strings[_nstring-1]) ) {
+    fprintf(stderr, "test1: push con valuep = NULL\n");
+    return -1; }
+
+  _handle_meno1err_exit(  found = 
+			  blockingList_contains(&list, strings[_nstring-1]),
+			  "test1", "blockingList_contains-2"  );
+  if (found) {
+    fprintf(stderr, "test1: trovato un elemento non aggiunto\n");
+    return -1; }
+
+  /*
+  if ( -1 != blockingList_push_string(&list, &found) ) {
+    fprintf(stderr, "test1: push con valuep sbagliato\n");
+    return -1; }
+  */
+
+  _handle_meno1err_exit(  blockingList_destroy(&list),
+			  "test1", "blockingList_destroy"  );
+
+  return 0;
+}
+
+/* ====================================================================== */
+
+/* inserisci rimuovi e ricerca 
+ * blockingList_pop_string, blockingList_remove, blockingList_removeAll */
+int
+test2(void)
+{
+  blockingList_t list;
+  int i = 0, found = 0;
+  char * elemValue = NULL;
+  
+  _handle_meno1err_exit(  blockingList_init(&list, 0, 
+					    copy_string, 
+					    compare_string),
+			  "test2", "blockingList_init");
+
+  /* POP: USO CORRETTO */
+  for (i=0; i<_nstring; i++)
+    _handle_meno1err_exit(  blockingList_push_string(&list, strings[i]),
+			    "test2", "blockingList_push_string-for1");
+  
+  for (i=_nstring-1; i>0; i--) {
+    _handle_meno1err_exit(  blockingList_pop_string(&list, &elemValue),
+			    "test2", "blockingList_pop_string-for1"  );
+    if (compare_string(strings[i], (char *)elemValue)) {
+      fprintf(stderr, "test2: l'elemento estratto (pop) %s(stack=%d)non e' corretto \n", (char *)elemValue, i);
+      return -1;
+    }
+    free(elemValue);
+  }
+
+  for (i=1; i<_nstring; i++) {
+    _handle_meno1err_exit(  found =
+			    blockingList_contains(&list, strings[i]),
+			    "test2", "blockingList_contains-for1"  );
+    if (found) {
+      fprintf(stderr, "test2: l'elemento %s(ins=%d) e' presente in lista\n", strings[i], i);
+      return -1;
+    }
+  }
+
+  _handle_meno1err_exit(  blockingList_pop_string(&list, NULL),
+			  "test2", "blockingList_pop_string-whitNULLelemValue"  );
+  _handle_meno1err_exit(  blockingList_contains(&list, strings[0]),
+			  "test2", "blockingList_contains-strings[0]"  );
+
+
+  /* POP: USO NON CORRETTO */
+  if (-1 != blockingList_pop_string(NULL, &elemValue)) {
+    fprintf(stderr, "l'elemento estratto (pop) %s(%d)non e' corretto \n", (char *)elemValue, i);
+    return -1; }
+  
+  
+  return 0;
+}
+
+/* ====================================================================== */
+
+#define _cnsClr "36m"
+
+/** consuma un numero arbitrario di elementi dalla pila condivisa 
+ *  ingr0: identificatore intero del thread
+ *  ingr1: lista condivisa
+ *  ingr2: secs da attendere prima di pop
+ *  ingr3: secs impiegati per consumare un nuovo dato
+ *  ingr4: numero di elementi da consumare
+ */
+void *
+taskConsumerTask(void * arg)
+{
+  int tiide = (int) ((void **) arg) [0];
+  blockingList_t * list = (blockingList_t *) ((void **) arg) [1];
+  int secs_prePop = (int) ((void **) arg) [2];
+  int secs_consuming = (int) ((void **) arg) [3];
+  int toCnsme = (int) ((void **) arg) [4];
+  struct timespec toSleep;
+  char * elemValue = NULL;
+  int i = 0;
+
+  toSleep.tv_nsec = 0;
+
+  if (printInfo) printf("\033[;"_cnsClr"consumer-%d: inizio\n\033[0m", tiide);
+
+
+  for (i=0; i<toCnsme; i++) {
+
+    _sleep(toSleep, secs_prePop, "consumer");
+
+    if (printInfo) printf("\033[;"_cnsClr"consumer-%d: provo ad estrarre un elemento\n\033[0m", tiide);
+    
+    _handle_meno1err_ptexit_iide(  blockingList_pop_string(list, &elemValue),
+				   "consumer", tiide, "blockingList_pop_string"  );
+
+
+    if (printInfo) printf("\033[;"_cnsClr"consumer-%d: ESTRATTO %s,\n"
+			  "consumer-%d: CONSUMO ...\n\033[0m", tiide, elemValue, tiide);
+
+    _sleep(toSleep, secs_consuming, "consumer?");
+
+    free(elemValue);
+	
+    if (printInfo) printf("\033[;"_cnsClr"consumer-%d: ... FINE CONSUMAZIONE\n\033[0m", tiide);
+
+  }
+  
+  if (printInfo) printf("\033[;"_cnsClr"consumer-%d: fine\n\033[0m", tiide);
+
+
+  return (void *) 0;
+}
+
+/* ---------------------------------------------------------------------- */
+
+#define _prdClr "33m"
+
+
+/** produce _nstring nella pila condivisa 
+ *  ingr0: identificatore intero del thread
+ *  ingr1: lista condivisa
+ *  ingr2: secs impiegati per produrre un nuovo dato
+ *  ingr3: secs da attendere prima di push
+ */
+void *
+stackProducerTask(void * arg)
+{
+  int tiide = (int) ((void **) arg) [0];
+  blockingList_t * list = (blockingList_t *) ((void **) arg) [1];
+  int secs_producing = (int) ((void **) arg) [2];
+  int secs_prePush = (int) ((void **) arg) [3];
+  int i = 0;
+
+  struct timespec toSleep;
+
+  toSleep.tv_nsec = 0;
+
+  if (printInfo) printf("\033[;"_prdClr"producer-%d: inizio\n\033[0m", tiide);
+
+  for (i=0; i<_nstring; i++) {
+
+    if (printInfo) printf("\033[;"_prdClr"producer-%d: PRODUCO ... \n\033[0m", tiide);
+
+    _sleep(toSleep, secs_producing, "producer?");
+
+    if (printInfo) printf("\033[;"_prdClr"producer-%d: FINE PRODUZIONE\n\033[0m", tiide);
+
+
+    _sleep(toSleep, secs_prePush, "producer?");
+
+    if (printInfo) printf("\033[;"_prdClr"producer-%d: provo ad aggiungere un elemento\n\033[0m", tiide);
+
+    _handle_meno1err_ptexit_iide(  blockingList_push_string(list, strings[i]),
+				   "producer", tiide, "blockingList_push_string"  );
+
+    if (printInfo) printf("\033[;"_prdClr"producer-%d: AGGIUNTO %s\n\033[;0m", tiide,  strings[i]);
+  }
+  
+  if (printInfo) printf("\033[;"_prdClr"producer-%d: fine\n\033[0m", tiide);
+
+
+  return (void *) 0;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void
+dispatch_simple_cleanUp(void * arg)
+{
+  blockingList_t * list = (blockingList_t *) arg;
+  blockingList_destroy(list);
+}
+
+/* avvia un consumatore ed un produttore e ne attende la terminazione */
+int
+dispatch_simple(int cns_prePop, int cns_cnsing, 
+		int prd_prding, int prd_prePsh )
+{
+  blockingList_t list; /* lista(pila) condivisa */
+  pthread_t cns_ti, prd_ti;
+  void * cns_arg[5], * prd_arg[4];
+  int es = 0;
+  void * tes = 0;
+
+  _handle_meno1err_ptexit(  blockingList_init(&list, 0, 
+						   copy_string, compare_string),
+			    "consumer", "blockingList_init"  );
+
+
+  pthread_cleanup_push(dispatch_simple_cleanUp, &list);
+
+
+  cns_arg[0] = (void *) 0; cns_arg[1] = (void *) &list;
+  cns_arg[2] = (void *) cns_prePop; cns_arg[3] = (void *) cns_cnsing;
+  cns_arg[4] = (void *) _nstring;
+  prd_arg[0] = (void *) 0; prd_arg[1] = (void *) &list;
+  prd_arg[2] = (void *) prd_prding; prd_arg[3] = (void *) prd_prePsh;
+
+  _handle_ptherr_exit(  pthread_create(&cns_ti, NULL,
+				       taskConsumerTask, cns_arg),
+			"test3", "pthread_create1"  );
+  _handle_ptherr_exit(  pthread_create(&prd_ti, NULL,
+				       stackProducerTask, prd_arg),
+			"test3", "pthread_create2"  );
+  _handle_ptherr_exit(  pthread_join(cns_ti, &tes),
+			"test3", "pthread_join1"  );
+  es = tes ? -1 : es;
+  _handle_ptherr_exit(  pthread_join(prd_ti, &tes),
+			"test3", "pthread_join2"  );
+  es = tes ? -1 : es;
+
+
+  pthread_cleanup_pop(1);
+
+
+  return es;
+}
+
+/* ====================================================================== */
+
+/** test delle funzioni bloccanti relative ad una struttura stack
+ *  thread concorrenti: 1 produttore, 1 consumatore
+ *  il consumatore e' piu' veloce del produttore
+ */
+int
+test3(void)
+{
+  return dispatch_simple(0, 2, 5, 0);
+}
+
+/** test delle funzioni bloccanti relative ad una struttura stack
+ *  thread concorrenti: 1 produttore, 1 consumatore
+ *  il consumatore e' piu' lento del produttore
+ */
+int
+test4(void)
+{
+  return dispatch_simple(0, 5, 2, 0);
+}
+  
+
+void *
+copy_shared(void * a)
+{
+  return a;
+}
+
+int
+compare_shared(void * a, void * b)
+{
+  return (int) a - (int) b;
+}
+
+
+/** test dell'iteratore
+ *
+ */
+int
+test5(void)
+{
+  blockingList_t list;
+  blockingList_itr_t itr;
+  int i = 0;
+
+  _handle_meno1err_exit(  blockingList_init(&list, 0,
+					    copy_int,
+					    compare_int),
+			  "test5", "blockingList_init"  );
+
+  for (i=0; i<10; i++)
+    _handle_meno1err_exit(  blockingList_push(&list, (void *)&i),
+			    "test5", "blockingList_push"  );
+
+  _handle_meno1err_exit(  blockingList_itr_init(&itr, &list),
+			  "test5", "blockingList_itr_init"  );
+
+  i = 0;
+  do {
+    void * nextValue = NULL;
+
+    if( NULL != (nextValue = blockingList_itr_getValue(&itr)) ) {
+      if (printInfo) 
+	printf("%d: prossimo valore = %d\n", i, * (int *) nextValue);
+    } else
+      if (printInfo)
+	printf("%d: Fine Lista\n", i);
+    i++;
+  } while(blockingList_itr_next(&itr));
+
+
+  _handle_meno1err_exit(  blockingList_destroy(&list),
+			  "test5", "blockingList_destroy"  );
+
+  _handle_meno1err_exit(  blockingList_itr_destroy(&itr), 
+			  "test5", "blockingList_itr_destroy"  );
+
+  return 0;
+}
+
+
+/** test di una lista FIFO 
+ *
+ */
+int
+testFIFO(void)
+{
+  blockingList_t * list = NULL;
+  char ** nextString = NULL;
+  int found = 0;
+
+  _handle_nullerr_return(list = blockingList_new(0, copy_string, compare_string),
+			  "testFIFO", "blockingList_new");
+
+
+  /* inserzione con blockingList_put */
+  while ( ( !nextString && (nextString =  strings) ) || *(++nextString) ) {
+
+    _handle_meno1err_return(blockingList_put_string(list, *nextString),
+			    "testFIFO", "blockingList_put_string");
+
+    _handle_meno1err_return(found = 
+			    blockingList_contains_string(list, *nextString),
+			    "testFIFO", "blockingList_contains_string(1)");
+    if (!found) {
+      if (printInfo) printf("testFIFO: non inserito correttamente l'elemnto "
+			    "di valore >%s<\n", *nextString);
+      return -1;
+    }
+  }
+
+  if (printInfo) {
+    blockingList_itr_t listitr;
+    char * nextValue = NULL;
+    int i = 0;
+
+    blockingList_itr_init(&listitr, list);
+
+    while ( NULL != ( nextValue = blockingList_itr_getValue(&listitr) ) ) {
+      i++;
+      printf("element #%d: >%s<\n", i, nextValue);
+      blockingList_itr_next(&listitr);
+    }
+
+  }
+
+  /* ricerca con blockingList_contains */
+  nextString = strings;
+  do {
+    
+    _handle_meno1err_return(found = 
+			    blockingList_contains_string(list, *nextString),
+			    "testFIFO", "blockingList_contains_string(2)");
+
+    if (!found) {
+      if (printInfo) printf("testFIFO: non trovato l'elemnto "
+			    "di valore >%s<\n", *nextString);
+      return -1;
+    }
+  } while ( *++nextString );
+
+  /* rimozione dal piu' vecchio al piu' giovane con blockingList_poll */
+  nextString = strings;
+  do {
+    
+    char * tmpString = NULL;
+
+    _handle_meno1err_return(blockingList_pop_string(list, &tmpString),
+			    "testFIFO", "blockingList_take_string");
+
+    if ( compare_string(tmpString, *nextString) ) {
+      if (printInfo) printf("testFIFO: la stringa >%s< estratta dalla coda "
+			   "della lista e' diversa dalla stringa >%s<\n",
+			   tmpString, *nextString);
+      return -1;
+    }
+
+    _handle_meno1err_return(found = 
+			    blockingList_contains_string(list, *nextString),
+			    "testFIFO", "blockingList_contains_string(3)");
+
+    /* occorre rimuovere esplicitamente l'elemento estratto con
+       blockingList_poll */
+    free(tmpString);
+
+  } while ( *++nextString );
+
+  blockingList_free(&list);
+
+  return 0;
+}
+
+/* ====================================================================== */
+
+#define _doTest(_testFun, _testEs, _testInfo, _printFlag)		\
+  {									\
+    int __es = 0;							\
+    _testEs = (__es = _testFun()) ? -1 : _testEs;			\
+    if (_printFlag) {							\
+      printf(_testInfo"\n   ");						\
+      if (!__es) printf("V  Completato\n");				\
+      else printf("X  Fallito\n");					\
+    }									\
+  }
+
+#define _pritnInfo printf("myTest_blockingList <t,p> [min] [max]\n"	\
+			  "\tt    stampa il risultato complessivo dell'insieme dei test\n" \
+			  "\tp    stampa il risultato per ogni test dell'insieme dei test\n" \
+			  "\tmin  intero che identifica il primo test da eseguire (0%%%d)\n" \
+			  "\tmax  intero che identifica l'ultimo test da eseguire (0%%%d)\n", \
+			  _ntest-1, _ntest-1);
+
+#define _ntest 10
+
+
+int
+main(int argc, char ** argv)
+{
+  int es = 0, i = 0, min = 0, max = 0;
+
+  /* myTest_blockingList t x y  esegui i test da x a y
+     myTest_blockingList t x    esegui il test x
+     myTest_blockingList p x y  esegui i test da x a y con stampe
+     myTest_blockingList p x    esegui il test x con stampe */
+
+  if (argc < 1+1) {
+    _pritnInfo;
+    return 0;
+  }
+
+  if (*argv[1] == 't') printInfo = 0;
+  else if (*argv[1] == 'p') printInfo = 1;
+  else { _pritnInfo; return 0; }
+
+  switch (argc) {
+  case 1+1:
+    min = 0; 
+    max = _ntest;
+    break;
+  case 2+1: 
+    min = max = *argv[2] - 48; break;
+  case 3+1:
+    min = *argv[2] - 48;
+    max = *argv[3] - 48;
+    break;
+  default:
+    _pritnInfo; return 0;
+  }
+
+  for (i=min; i<max+1; i++) {
+    switch (i) {
+    case 0:
+      _doTest(test0, es, "Test Crea e Distruggi", printInfo);
+      break;
+    case 1:
+      _doTest(test1, es, "Test Aggiungi e Ricerca", printInfo);
+      break;
+    case 2:
+      _doTest(test2, es, "Test Rimuovi e Ricerca", printInfo);
+      break;
+    case 5:
+      _doTest(test3, es, "Test Thread Concorrenti1", printInfo);
+      break;
+    case 6:
+      _doTest(test4, es, "Test Thread Concorrenti2", printInfo);
+      break;
+    case 3:
+      _doTest(test5, es, "Test Iteratore", printInfo);
+      break;
+    case 4:
+      _doTest(testFIFO, es, "Test lista FIFO", printInfo);
+      break;
+    }
+  }
+
+  if (!es) printf("\n\033[1;32mTest Set Superato!\n\033[0m");
+  else printf("\n\033[1;31mTest Set Fallito\n\033[0m");
+
+  return es;
+}

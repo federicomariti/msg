@@ -1,0 +1,9 @@
+#!/bin/bash
+
+./msgcli minnie<<EOF
+%ONE jjj kkkk
+%ONE jj kkkk  lll hhh 
+%ONE minnie llll  lll hhh
+%LIST
+gigi e mauro vanno a spasso
+EOF

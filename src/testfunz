@@ -1,0 +1,22 @@
+#!/bin/sh
+
+#test attivazione server
+./msgserv userlist log 2> .err &
+
+#test sequenziale client
+echo "###Test primo client ..."
+./client1.test 2> .errcli1 1>outcli1 
+
+echo "###Test secondo client ..." 
+./client3.test 2> .errcli3 1>outcli3
+
+# test chiusura stdin
+echo "###Test terzo client ... chiusura stdin" 
+./client2.test 2> .errcli2 1>outcli2
+
+# test riconnessione
+echo "###Test primo client ... riconnessione" 
+./client1.test 2>> .errcli1 1>>outcli1
+
+exit 0
+

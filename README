@@ -1,0 +1,57 @@
+=========================================================================
+ISTRUZIONI e SPECIFICHE per il progetto finale
+========================================================================
+
+Il per sostenere l'esame di SOL si deve realizzare un progetto diviso
+in tre frammenti relativo al modulo di laboratorio (LSO) 
+
+Il progetto prevede l'implementazione di una semplice chat testuale.
+
+
+------------------------------------------------
+Estrarre il materiale dal file TAR
+------------------------------------------------
+Creare una directory temporanea, copiare il file tar
+nella directory e spostarsi nella directory appena creata. Es.
+
+$$ mkdir Frammento
+$$ mv lsokit_f3MSG.tar Frammento
+$$ cd Frammento
+
+S-tarare i file del kit
+
+$$ tar xvf lsokit_f3MSG.tar 
+
+questa operazione crea una directory MSG/
+che a sua volta contiene le seguenti directory:
+
+doc/
+	che contiene la documentazione del progetto
+
+src/
+	che contiene i file di include relativi alle funzioni da implementare,
+	gli script ed il materiale per il test del client e del server
+
+lib/
+	directory in cui risiede la libreria libmsg.a
+
+ed il file msg0910.pdf che contiene le specifiche complessive del progetto.
+
+Leggere attentamente le specifiche e procedere prima allo sviluppo della
+libreria libmsg (vedi src/README-1) e poi del server e dei client (vedi
+src/README-2 src/README-3).
+
+
+----------------------------
+ VALUTAZIONE DEL PROGETTO
+----------------------------
+
+Gli studenti che consegnano una versione funzionante e ragionevolmente
+corretta dei tre frammenti di progetto entro le tre date di scadenza 
+bonus di 2 punti a frammento  che verra' sommato al voto finale (vedi
+lucidi lezioni ed esercitazioni).
+
+La qualita' del codice consegnato contribuira' alla votazione finale insime
+alla prova orale e al codice degli altri frammenti. Per i criteri di
+valutazione rimandiamo alla sezione specifica in msg0910.pdf
+

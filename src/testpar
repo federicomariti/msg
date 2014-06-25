@@ -1,0 +1,70 @@
+#!/bin/bash
+
+
+#attivazione server
+./msgserv userlist log 2> .err &
+
+#test sequenziale client
+echo "###Test primo client ..." 2&>1
+./client1.test 2> .errcli1 1>outcli1 
+
+
+echo "###Test secondo client ..." 2&>1
+./client3.test 2> .errcli3 1>outcli3
+
+# test chiusura stdin
+echo "###Test terzo client ... chiusura stdin" 2&>1
+./client2.test 2> .errcli2 1>outcli2
+
+# test riconnessione
+echo "###Test primo client ... riconnessione" 2&>1
+./client1.test 2>> .errcli1 1>>outcli1
+
+# controllo broken pipe
+if ! killall -PIPE msgserv; then
+   echo msgserv: SIGPIPE non gestito
+   exit 1
+fi
+
+# controllo gestione sigterm
+if ! killall msgserv; then
+   echo msgserv: non attivo!
+   exit 1
+fi
+
+# controllo file di log
+echo "###Test log file ..." 2&>1
+sort < log >logsort
+if ! diff ./logsort ./logsort.check ; then
+   echo File di log differenti
+   exit 1
+fi
+
+
+#controllo parallelismo
+echo "###Test piu'client in parallelo ..." 2&>1
+./client1.test > ./out1a &
+./client1.test > ./out1b &
+./client1.test > ./out1c &
+./client2.test > ./out2a &
+./client2.test > ./out2b &
+./client2.test > ./out2c &
+./client3.test > ./out3a &
+./client3.test > ./out3b &
+./client3.test > ./out3c &
+
+# attivazione server
+./msgserv userlist logpar 2> .err &
+
+
+# facciamo girare un po' il server
+sleep 3
+
+# e' ancora attivo ?
+if ! killall msgserv; then
+   echo msgserv: non attivo!
+   exit 1
+fi
+
+
+exit 0

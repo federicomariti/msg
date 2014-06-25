@@ -1,0 +1,185 @@
+tp_init(..)
+	bl_init(..)
+	newThr = tp_thread_new(..)
+		malloc per tp_thread_t
+		malloc per void * arg [2]
+		pthread_create(..)
+	bl_push(.., newThr)
+
+tp_shutdownNow(..)
+	
+
+quesiti:
+
+------------------------------
+(1)comsock.c:sendMessage
+------------------------------
+il valore del campo buffer del messaggio e' un puntatore ad una
+stringa di caratteri.
+
+tale stringa contiene il carattere di fine stringa?
+
+-> si, allora posso verificare che il valore del campo length del
+   messaggio sia >= alla lunghezza effettiva della stringa
+
+-> no, allora non conosco la lunghezza effettiva della stringa e mi
+   devo basare sul valore del campo lenght del messaggio.
+
+>>> MA in entrambi i casi devo decidere se spedire anche il carattere
+di fine stringa al peer collegato oppure no. <<<
+
+nel secondo caso e' ragionevole che sia la funzione receiveMessage ad
+aggiungere il carattere di fine stringa.
+
+
+------------------------------
+(2)comsock.c:receiveMessage
+------------------------------
+e' necessario aggiungere il carattere di fine stringa alla valore del
+campo buffer del messaggio?
+
+
+
+risposte: 
+
+==============================
+protocollo di comunicazione
+==============================
+(1) (2)
+------------------------------
+il campo buffer del messaggio contine una stringa terminata da '\0' ?
+
+-> no, allora la lettura e la scrittura del valore di tale campo sono
+   effettuate solo specificando la lunghezza espressa nel campo length
+   del messaggio stesso, che si assume sempre sia la corretta
+   lunghezza della stringa del messaggio.
+
+-> si, allora e' ragionevole scrivere e leggere anche il carattere di
+   fine stringa rispettivamente nelle funzioni comsock.c:sendMessage e
+   comsock.c:receiveMessage. 
+   in questo caso e' possibile controllare la correttezza del valore
+   del parametro length del messaggio che deve essere sempre minore o
+   uguale alla lunghezza della stringa puntata da buffer del messaggio
+
+specifica del progetto:
+  
+  " Se buﬀer e' una stringa il suo valore comprende anche il
+    terminatore di stringa ’\0’ ﬁnale che deve essere presente nel
+    buﬀer. 
+
+    Il campo length e' un unsigned int che indica la dimensione del
+    campo buffer
+ 
+    Il campo length vale 0 nel caso in cui il campo buffer non sia
+    signiﬁcativo. "
+
+mia specifica:
+
+>>> il valore del campo buffer e' una stringa, quindi una array di
+    caratteri terminato da '\0'.  
+    (quindi '\0' deve essere sempre presente nella stringa puntata da
+    buffer)
+    
+    il campo lenght vale 0 se il valore del campo buffer non e'
+    significativo, altrimenti corrisponde a strlen(buffer)+1 
+
+    se si presenta il caso in cui il campo length ha valore minore di
+    strlen(buffer)+1 le funzioni receiveMessage e sendMessage devono
+    terminare e ritornare errore <<<
+
+nota:
+(1) il carattere di fine stinga relativo al valore di buffer e'
+    spedito se il valore del campo length e' diverso da 0
+
+(2) la lettura del valore del campo buffer comprende anche il
+    carattere di fine stringa, quindi non e' necessario aggiungerlo
+
+------------------------------
+end (1)(2) 
+------------------------------
+
+action    |  byts allct  |  byts rd  |  msgBufActlSize
+init	     8    	    -    	0
+postRd	     8		    8  	      	0
+postRd2	     8		    8	      	8
+postReAl     16		    8	      	8
+preRd	     16		    -	      	8
+postRd	     16		    8	      	8
+postRd2	     16		    8	      	16
+postReAl     24		    8 		16
+preRd	     24		    -		16
+postRd	     24		    4		16
+postRd2	     24		    4		20
+postReAl     28		    4		20
+fine
+
+
+action    |  byts allct  |  byts rd  |  msgBufActlSize  | tot byts rd
+preReAl	     0    	    -    	0		  0
+postReAl     8		    -		8		  0
+postRd	     8		    8		8		  8
+preReAl	     8		    -		8		  8
+postReAl     16		    -		16		  8
+postRd	     16		    8		16		  16
+preReAl	     16		    -		16		  16
+postReal     24		    -		24		  16
+postRd	     24		    4		24		  20
+preReAlEnd   24		    -		24		  20
+postReAlEnd  20		    -		-		  20
+
+
+
+server
+1) apri file-utenti-autor e genera hash table (K:user-name, V:fd-a_socket)
+2) crea (trunc) file_log
+3) crea l_sock
+4) avvia thread-writer
+5) avvia thread-poolDispatcher
+
+server:thread-writer
+scrive i messaggi di log in file_log, tali messaggi sono forniti dai thread
+worker
+
+server:thread-worker
+serve una specifica connessione di un client al server, 
+alla ricezione di un messaggio:
+- parsa il tipo del messaggio
+- prodce il/i messaggio/i di risposta
+- se questo e' di tipo to-one / se questi sono di tipo bcast
+  allora invia questo/questi al thread-writer
+- invia il/i messaggio/i di risposta alla connessione corrispondente al
+  client richiesto
+
+la comunicazione  tra thread-worker e thread-write  avviene per via  di una pila
+condivisa.
+
+l'invio  di un  messaggio da  parte  di un  thread-worker ad  un client  avviene
+identificando il  fd del socket connesso  a tale client  effettuando una ricerca
+nella hash table, quindi si puo' procedere in due modi.
+
+  1) si invoca la funzione sendMessage sul socket trovato.
+  2) si ricerca la coda d'invio condivisa del thread-worker che serve la
+     connessione associata a tale socket, quindi si aggiunge il messaggio da
+     inviare a tale coda. 
+
+1) il corretto invio del messaggio avviene solo se sendMessage garantisce
+   l'invio atomico dell'intero messaggio.  
+   
+   in questo scenario infatti la scrittura sul socket avviene concorrentemente a
+   tutti gli altri thread-worker. 
+
+   la system call write su un socket garantisce l'invio atomico dei dati se la
+   dimenzione di tali e' inferiore a PIPE_BUF
+   
+   cio' non e' sufficente, la funzione sendMessage deve garantire l'invio
+   atomico dell'intero messaggio effettuando una sola write.
+
+   per messaggi di grandi dimensioni si ha race condition
+
+2) ogni socket e' scritto (oltre che letto) da uno e un solo thread-worker, tale
+   thread reperisce i messaggi da inviare sul socket da una pila condivisa con
+   gli altri thread-worker, oppure leggendo il socket stesso.
+
+   garantendo l'aggiunta atomica dei messaggi nella pila condivisa si e'
+   garantito anche l'invio atomico dei messaggi sul socket.
+

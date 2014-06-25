@@ -1,0 +1,52 @@
+#!/bin/sh
+
+#attivazioni erronee
+if ./msgserv ; then
+    exit 1
+fi
+
+if ./msgserv file2 ; then
+    exit 1
+fi
+
+if ./msgserv f g h j k ; then
+    exit 1
+fi
+# file utenti scorretto
+if ./msgserv userlist2 log ; then
+    exit 1
+fi
+
+if ./msgcli ; then
+    return 1
+fi
+
+if ./msgcli kk ll oo ; then
+    return 1
+fi
+
+# file utenti corretto ma
+# utente non autorizzato
+./msgserv userlist log 2>.err &
+if ./msgcli zorro 2>.err ; then
+    return 1
+fi
+
+# utente OK
+./msgcli pippo 2>.err 1>out31 <<EOF
+%LIST
+Ciao a tutti!
+%ONE ciccio Ciao!
+%ONE pippo  Ciao!
+%EXIT
+EOF
+
+# attandiamo la terminazione del client
+killall -w msgcli
+
+#uccidiamo il server
+if ! killall -w msgserv ; then
+    echo Nessun server attivo.
+fi
+
+
